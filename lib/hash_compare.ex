@@ -1,6 +1,8 @@
 defmodule HashCompare do
   @moduledoc """
   Documentation for `HashCompare`.
+
+  This module provides a single function, `compare`, which compares two hashes.
   """
 
   @type valid_key() :: String.t()
@@ -13,21 +15,11 @@ defmodule HashCompare do
     | valid_map()
   @type valid_map() :: %{valid_key() => valid_value()}
 
-  # Originally planned to use these as function guards
-  # but that was overkill for this use case
-  # defguard is_valid_key(key) when is_binary(key)
-  # defguard is_valid_value(val) when
-  #   is_binary(val) or
-  #   is_boolean(val) or
-  #   is_float(val) or
-  #   is_integer(val) or
-  #   is_list(val) or
-  #   is_map(val)
-  def is_valid_key(key) do
+  defp is_valid_key(key) do
     is_binary(key)
   end
 
-  def is_valid_value(val) do
+  defp is_valid_value(val) do
     is_binary(val) or
     is_boolean(val) or
     is_float(val) or
@@ -36,24 +28,7 @@ defmodule HashCompare do
     is_map(val)
   end
 
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> HashCompare.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
-
-  def add_or_update_foo(m) do
-    Map.put(m, "foo", "bar")
-  end
-
-  def extract_unique(hash1, hash2) do
+  defp extract_unique(hash1, hash2) do
     for {k1, v1} <- hash1 do
       if Map.has_key?(hash2, k1) and Map.get(hash2, k1) === v1 do
         {:same, nil}
@@ -65,6 +40,34 @@ defmodule HashCompare do
     |> Enum.map(fn(x) -> elem(x, 1) end)
   end
 
+
+  @doc """
+  Compare two hashes.
+
+  ## Examples
+      iex> HashCompare.compare(%{"foo" => "bar"}, %{"foo" => "bar"})
+      %{
+        "are_equal" => true,
+        "left_only" => [],
+        "right_only" => []
+      }
+
+      iex> HashCompare.compare(%{"foo" => "bar"}, %{"foo" => "tacos"})
+      %{
+        "are_equal" => false,
+        "left_only" => [{"foo", "bar"}],
+        "right_only" => [{"foo", "tacos"}]
+      }
+
+      iex> HashCompare.compare(%{"5" => "42", "almost" => "thesame", "foo" => "bar" }, %{"5" => "42", "almost" => "butnotquite"})
+      %{
+        "are_equal" => false,
+        "left_only" => [{"foo", "bar"}],
+        "right_only" => [{"foo", "tacos"}]
+      }
+  """
+  # @spec compare(valid_map(), valid_map()) :: %{optional(<<_::64, _::_*8>>) => boolean | list}
+  # @spec compare(valid_map(), valid_map()) :: %{ are_equal: boolean(), left_only: list(tuple()), right_only: list(tuple()) }
   def compare(hash1, hash2) do
     if !validate_map(hash1) or !validate_map(hash2) do
       raise "Invalid map"
@@ -80,7 +83,7 @@ defmodule HashCompare do
     }
   end
 
-  @spec validate_map(any) :: boolean()
+  # @spec validate_map(any) :: boolean()
   def validate_map(m) do
     for {k, v} <- m do
       if !is_valid_key(k) do

@@ -2,25 +2,6 @@ defmodule HashCompareTest do
   use ExUnit.Case
   doctest HashCompare
 
-  test "greets the world" do
-    assert HashCompare.hello() == :world
-  end
-
-  test "adds foo if not present" do
-    assert %{"blah" => "blargh", "foo" => "bar"}
-      == HashCompare.add_or_update_foo(%{"blah" => "blargh"})
-  end
-
-  test "updates foo if present" do
-    assert %{"blah" => "blargh", "foo" => "bar"}
-      == HashCompare.add_or_update_foo(%{"blah" => "blargh", "foo" => "bash"})
-  end
-
-  test "result is unchanged if same" do
-    m = %{"blah" => "blargh", "foo" => "bar"}
-    assert m == HashCompare.add_or_update_foo(m)
-  end
-
   test "identical hashes are equal" do
     assert %{
       "are_equal" => true,
@@ -29,6 +10,16 @@ defmodule HashCompareTest do
     } == HashCompare.compare(
       %{"foo" => "bar"},
       %{"foo" => "bar"})
+  end
+
+  test "identical hashes are n equal" do
+    assert %{
+      "are_equal" => false,
+      "left_only" => [{"foo", "bar"}],
+      "right_only" => [{"foo", "tacos"}]
+    } == HashCompare.compare(
+      %{"foo" => "bar"},
+      %{"foo" => "tacos"})
   end
 
   test "only strings allowed as keys" do
