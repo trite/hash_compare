@@ -5,42 +5,6 @@ defmodule HashCompare do
   This module provides a single function, `compare`, which compares two hashes.
   """
 
-  @type valid_key() :: String.t()
-  @type valid_value() ::
-    String.t()
-    | boolean()
-    | float()
-    | integer()
-    | list(valid_value())
-    | valid_map()
-  @type valid_map() :: %{valid_key() => valid_value()}
-
-  defp is_valid_key(key) do
-    is_binary(key)
-  end
-
-  defp is_valid_value(val) do
-    is_binary(val) or
-    is_boolean(val) or
-    is_float(val) or
-    is_integer(val) or
-    is_list(val) or
-    is_map(val)
-  end
-
-  defp extract_unique(hash1, hash2) do
-    for {k1, v1} <- hash1 do
-      if Map.has_key?(hash2, k1) and Map.get(hash2, k1) === v1 do
-        {:same, nil}
-      else
-        {:different, {k1, v1}}
-      end
-    end
-    |> Enum.filter(fn(x) -> elem(x, 0) == :different end)
-    |> Enum.map(fn(x) -> elem(x, 1) end)
-  end
-
-
   @doc """
   Compare two hashes.
 
@@ -62,37 +26,30 @@ defmodule HashCompare do
       iex> HashCompare.compare(%{"5" => "42", "almost" => "thesame", "foo" => "bar" }, %{"5" => "42", "almost" => "butnotquite"})
       %{
         "are_equal" => false,
-        "left_only" => [{"foo", "bar"}],
-        "right_only" => [{"foo", "tacos"}]
+        "left_only" => [{"almost", "thesame"}, {"foo", "bar"}],
+        "right_only" => [{"almost", "butnotquite"}]
       }
   """
-  # @spec compare(valid_map(), valid_map()) :: %{optional(<<_::64, _::_*8>>) => boolean | list}
-  # @spec compare(valid_map(), valid_map()) :: %{ are_equal: boolean(), left_only: list(tuple()), right_only: list(tuple()) }
-  def compare(hash1, hash2) do
-    if !validate_map(hash1) or !validate_map(hash2) do
-      raise "Invalid map"
-    end
-
-    hash1_unique = extract_unique(hash1, hash2)
-    hash2_unique = extract_unique(hash2, hash1)
+  def compare(left, right) do
+    left_unique = extract_unique(left, right)
+    right_unique = extract_unique(right, left)
 
     %{
-      "left_only" => hash1_unique,
-      "right_only" => hash2_unique,
-      "are_equal" => Enum.count(hash1_unique) == 0 and Enum.count(hash2_unique) == 0
+      "left_only" => left_unique,
+      "right_only" => right_unique,
+      "are_equal" => Enum.count(left_unique) == 0 and Enum.count(right_unique) == 0
     }
   end
 
-  # @spec validate_map(any) :: boolean()
-  def validate_map(m) do
-    for {k, v} <- m do
-      if !is_valid_key(k) do
-        false
-      end
-      if !is_valid_value(v) do
-        false
+  defp extract_unique(keep, toss) do
+    for {k1, v1} <- keep do
+      if Map.has_key?(toss, k1) and Map.get(toss, k1) === v1 do
+        {:same, nil}
+      else
+        {:different, {k1, v1}}
       end
     end
-    true
+    |> Enum.filter(fn(x) -> elem(x, 0) == :different end)
+    |> Enum.map(fn(x) -> elem(x, 1) end)
   end
 end
