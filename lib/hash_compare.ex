@@ -68,7 +68,7 @@ defmodule HashCompare do
     Map.merge(left_result, right_result)
   end
   
-  def compare_values(key, left, right, deep) do
+  defp compare_values(key, left, right, deep) do
     if deep do
       deep_compare_values(key, left, right)
     else
@@ -76,19 +76,19 @@ defmodule HashCompare do
     end
   end
 
-  def deep_compare_values(key, left, right) when is_map(left) and is_map(right) do
+  defp deep_compare_values(key, left, right) when is_map(left) and is_map(right) do
     {key, {:sub_map, compare(left, right, true)}} # recurse... TODO: make sure this works right once things are put together
   end
 
-  def deep_compare_values(key, left, right) do
+  defp deep_compare_values(key, left, right) do
     simple_compare_values(key, left, right)
   end
   
-  def shallow_compare_values(key, left, right) do
+  defp shallow_compare_values(key, left, right) do
     simple_compare_values(key, left, right)
   end
   
-  def simple_compare_values(key, left, right) do
+  defp simple_compare_values(key, left, right) do
     if left === right do
       {key, {:same, left}}
     else
