@@ -77,7 +77,7 @@ defmodule HashCompare do
   end
 
   defp deep_compare_values(key, left, right) when is_map(left) and is_map(right) do
-    {key, {:sub_map, compare(left, right, true)}} # recurse... TODO: make sure this works right once things are put together
+    {key, {:sub_map, compare(left, right, true)}}
   end
 
   defp deep_compare_values(key, left, right) do
