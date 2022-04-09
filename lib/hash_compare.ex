@@ -6,50 +6,93 @@ defmodule HashCompare do
   """
 
   @doc """
-  Compare two hashes.
+  Compare two hashes. Specifying true for `deep` parameter will scan sub-hashes as well.
 
   ## Examples
-      iex> HashCompare.compare(%{"foo" => "bar"}, %{"foo" => "bar"})
+      iex> HashCompare.compare(%{"foo" => "bar"}, %{"foo" => "bar"}, false)
+      %{"foo" => {:same, "bar"}}
+
+      iex> HashCompare.compare(%{"foo" => "bar"}, %{"foo" => "tacos"}, false)
+      %{"foo" => {:different, %{left: "bar", right: "tacos"}}}
+
+      iex> HashCompare.compare(%{"5" => "42", "almost" => "thesame", "foo" => "bar" }, %{"5" => "42", "almost" => "butnotquite"}, false)
       %{
-        "are_equal" => true,
-        "left_only" => [],
-        "right_only" => []
+        "5" => {:same, "42"},
+        "almost" => {:different,
+          %{left: "thesame", right: "butnotquite"}},
+        "foo" => {:left_only, "bar"}
+      }
+      
+      iex> HashCompare.compare(%{"foo" => %{"a" => "b", 1 => 2}}, %{"foo" => %{"a" => "b", 1 => 42}}, false)
+      %{
+        "foo" => {:different,
+          %{
+            left: %{1 => 2, "a" => "b"},
+            right: %{1 => 42, "a" => "b"}
+          }}
       }
 
-      iex> HashCompare.compare(%{"foo" => "bar"}, %{"foo" => "tacos"})
+      iex> HashCompare.compare(%{"foo" => %{"a" => "b", 1 => 2}}, %{"foo" => %{"a" => "b", 1 => 42}}, true)
       %{
-        "are_equal" => false,
-        "left_only" => [{"foo", "bar"}],
-        "right_only" => [{"foo", "tacos"}]
+        "foo" => {:sub_map,
+          %{
+            1 => {:different, %{left: 2, right: 42}},
+            "a" => {:same, "b"}
+          }}
       }
-
-      iex> HashCompare.compare(%{"5" => "42", "almost" => "thesame", "foo" => "bar" }, %{"5" => "42", "almost" => "butnotquite"})
-      %{
-        "are_equal" => false,
-        "left_only" => [{"almost", "thesame"}, {"foo", "bar"}],
-        "right_only" => [{"almost", "butnotquite"}]
-      }
+      
   """
-  def compare(left, right) do
-    left_unique = extract_unique(left, right)
-    right_unique = extract_unique(right, left)
+  
+  def compare(left, right, deep) do
+    left_result = 
+      for {k1, v1} <- left, into: %{} do
+        if Map.has_key?(right, k1) do
+          compare_values(k1, v1, right[k1], deep)
+        else
+          {k1, {:left_only, v1}}
+        end
+      end
 
-    %{
-      "left_only" => left_unique,
-      "right_only" => right_unique,
-      "are_equal" => Enum.count(left_unique) == 0 and Enum.count(right_unique) == 0
-    }
+    right_result =
+      for {k2, v2} <- right do
+        if Map.has_key?(left_result, k2) do
+          {:drop, nil}
+        else
+          {:keep, {k2, {:right_only, v2}}}
+        end
+      end
+      |> Enum.filter(fn(x) -> elem(x,0) == :keep end)
+      |> Enum.map(fn(x) -> elem(x,1) end)
+      |> Map.new
+      
+    Map.merge(left_result, right_result)
+  end
+  
+  def compare_values(key, left, right, deep) do
+    if deep do
+      deep_compare_values(key, left, right)
+    else
+      shallow_compare_values(key, left, right)
+    end
   end
 
-  defp extract_unique(keep, toss) do
-    for {k1, v1} <- keep do
-      if Map.has_key?(toss, k1) and Map.get(toss, k1) === v1 do
-        {:same, nil}
-      else
-        {:different, {k1, v1}}
-      end
+  def deep_compare_values(key, left, right) when is_map(left) and is_map(right) do
+    {key, {:sub_map, compare(left, right, true)}} # recurse... TODO: make sure this works right once things are put together
+  end
+
+  def deep_compare_values(key, left, right) do
+    simple_compare_values(key, left, right)
+  end
+  
+  def shallow_compare_values(key, left, right) do
+    simple_compare_values(key, left, right)
+  end
+  
+  def simple_compare_values(key, left, right) do
+    if left === right do
+      {key, {:same, left}}
+    else
+      {key, {:different, %{left: left, right: right}}}
     end
-    |> Enum.filter(fn(x) -> elem(x, 0) == :different end)
-    |> Enum.map(fn(x) -> elem(x, 1) end)
   end
 end

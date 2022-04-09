@@ -4,80 +4,208 @@ defmodule HashCompareTest do
   # It seems a bit redundant to do the same tests below that are also done in the doctests.
   # But I'm not sure what the preferred practices around this are just yet, keeping both for now.
   doctest HashCompare
-
-  test "identical hashes are equal" do
+  
+  test "simple identical hashes are equal on shallow compare" do
     assert %{
-      "are_equal" => true,
-      "left_only" => [],
-      "right_only" => []
+      "foo" => {:same, "bar"}
     } == HashCompare.compare(
       %{"foo" => "bar"},
-      %{"foo" => "bar"})
+      %{"foo" => "bar"},
+      false)
   end
 
-  test "similar keys but different values show up in both of result" do
+  test "simple identical hashes are equal on deep compare" do
     assert %{
-      "are_equal" => false,
-      "left_only" => [{"foo", "bar"}],
-      "right_only" => [{"foo", "tacos"}]
+      "foo" => {:same, "bar"}
     } == HashCompare.compare(
       %{"foo" => "bar"},
-      %{"foo" => "tacos"})
+      %{"foo" => "bar"},
+      true)
   end
-
-  test "only extracts key/value pairs that do not have an exact match" do
+  
+  test "simple hash with left-unique values on shallow compare" do
     assert %{
-        "are_equal" => false,
-        "left_only" => [{"almost", "thesame"}, {"foo", "bar"}],
-        "right_only" => [{"almost", "butnotquite"}]
-      } == HashCompare.compare(
-        %{"5" => "42", "almost" => "thesame", "foo" => "bar" },
-        %{"5" => "42", "almost" => "butnotquite"})
+      "foo" => {:left_only, "bar"}
+    } == HashCompare.compare(
+      %{"foo" => "bar"},
+      %{},
+      false)
   end
 
-  test "identical maps with child lists/maps compare as same" do
-    complex = %{
-      5 => "42",
-      :something => [ "foo", "bar", "baz" ],
-      "food_today" => %{
-        "breakfast" => "eggs",
-        "lunch" => "tacos",
-        "dinner" => "stir fry"
+  test "simple hash with left-unique values on deep compare" do
+    assert %{
+      "foo" => {:left_only, "bar"}
+    } == HashCompare.compare(
+      %{"foo" => "bar"},
+      %{},
+      true)
+  end
+  
+  test "simple hash with right-unique values on shallow compare" do
+    assert %{
+      "foo" => {:right_only, "bar"}
+    } == HashCompare.compare(
+      %{},
+      %{"foo" => "bar"},
+      false)
+  end
+  
+  test "simple hash with right-unique values on deep compare" do
+    assert %{
+      "foo" => {:right_only, "bar"}
+    } == HashCompare.compare(
+      %{},
+      %{"foo" => "bar"},
+      true)
+  end
+  
+  test "complex hash with identical sub-maps on shallow compare" do
+    both = %{
+      "foo" => %{
+        "a" => "b",
+        1 => 2,
+        :blah => 37.5
       }
     }
-
+    
     assert %{
-      "are_equal" => true,
-      "left_only" => [],
-      "right_only" => []
-      } == HashCompare.compare(complex, complex)
+      "foo" => {:same, %{
+        1 => 2,
+        :blah => 37.5,
+        "a" => "b"
+      }}
+    } == HashCompare.compare(both, both, false)
   end
-
-  test "different maps with child lists/maps only extracts non-matched pairs" do
-    left = %{
-      5 => "42",
-      "food_today" => %{
-        "breakfast" => "eggs",
-        "lunch" => "tacos",
-        "dinner" => "stir fry"
-      }
-    }
+  
+  test "complex hash with left-unique entries in sub-map on shallow compare" do
     right = %{
-      5 => "42",
-      :something => [ "foo", "bar", "baz" ]
+      "a" => "b",
+      "sub map" => %{
+        :lunch => "undecided",
+        "answer" => 42,
+        "change" => "original value"
+      },
+      :list => ["foo", 42]
     }
 
-    assert %{
-      "are_equal" => false,
-      "left_only" => [
-        {"food_today",
+    left = put_in(right["sub map"]["change"], "modified value!")
+
+    result = %{
+      "a" => {:same, "b"},
+      "sub map" => {:different,
+       %{
+         left: %{
+           :lunch => "undecided",
+           "answer" => 42,
+           "change" => "modified value!"
+         },
+         right: %{
+           :lunch => "undecided",
+           "answer" => 42,
+           "change" => "original value"
+         }
+       }},
+      :list => {:same, ["foo", 42]}
+    } 
+    
+    assert result == HashCompare.compare(left, right, false)
+  end
+
+  test "complex hash with left-unique entries in sub-map on deep compare" do
+    right = %{
+      "a" => "b",
+      "sub map" => %{
+        :lunch => "undecided",
+        "answer" => 42,
+        "change" => "original value"
+      },
+      :list => ["foo", 42]
+    }
+
+    left = put_in(right["sub map"]["change"], "modified value!")
+    
+    result = %{
+      "a" => {:same, "b"},
+      "sub map" => {:sub_map,
+       %{
+         :lunch => {:same, "undecided"},
+         "answer" => {:same, 42},
+         "change" => {:different,
           %{
-            "breakfast" => "eggs",
-            "dinner" => "stir fry",
-            "lunch" => "tacos"
+            left: "modified value!",
+            right: "original value"
           }}
-      ],
-      "right_only" => [something: ["foo", "bar", "baz"]]
-    } == HashCompare.compare(left, right)
+       }},
+      :list => {:same, ["foo", 42]}
+    }
+    
+    assert result == HashCompare.compare(left, right, true)
+  end
+  
+  test "repeatedly nested map on shallow compare" do
+    right = %{
+      :a => %{
+        "b" => %{
+          3 => %{
+            42.0 => %{
+              "really deep" => :original
+            }
+          }
+        }
+      }
+    }
+    
+    left = put_in(right[:a]["b"][3][42.0]["really deep"], "modified!")
+    
+    result = %{
+      a: {:different, %{
+        left: %{
+          "b" => %{
+            3 => %{42.0 => %{"really deep" => "modified!"}}
+          }
+        },
+        right: %{
+          "b" => %{
+            3 => %{42.0 => %{"really deep" => :original}}
+          }
+        }
+      }}
+    }
+
+    assert result == HashCompare.compare(left, right, false)
+  end
+
+  test "repeatedly nested map on deep compare" do
+    right = %{
+      :a => %{
+        "b" => %{
+          3 => %{
+            42.0 => %{
+              "really deep" => :original
+            }
+          }
+        }
+      }
+    }
+    
+    left = put_in(right[:a]["b"][3][42.0]["really deep"], "modified!")
+    
+    result = %{
+      a: {:sub_map,
+        %{
+          "b" => {:sub_map,
+          %{
+            3 => {:sub_map,
+              %{
+                42.0 => {:sub_map,
+                %{
+                  "really deep" => {:different,
+                    %{left: "modified!", right: :original}}  
+                }}
+              }}
+          }}
+        }}
+    }
+    assert result == HashCompare.compare(left, right, true)
   end
 end
