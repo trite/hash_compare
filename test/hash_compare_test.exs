@@ -68,13 +68,36 @@ defmodule HashCompareTest do
       }
     }
     
-    assert %{
+    result = %{
       "foo" => {:same, %{
         1 => 2,
         :blah => 37.5,
         "a" => "b"
       }}
-    } == HashCompare.compare(both, both, false)
+    }
+    
+    assert result == HashCompare.compare(both, both, false)
+  end
+
+  test "complex hash with identical sub-maps on deep compare" do
+    both = %{
+      "foo" => %{
+        "a" => "b",
+        1 => 2,
+        :blah => 37.5
+      }
+    }
+    
+    result = %{
+      "foo" => {:sub_map,
+       %{
+         1 => {:same, 2},
+         :blah => {:same, 37.5},
+         "a" => {:same, "b"}
+       }}
+    }
+    
+    assert result == HashCompare.compare(both, both, true)
   end
   
   test "complex hash with left-unique entries in sub-map on shallow compare" do
@@ -192,18 +215,14 @@ defmodule HashCompareTest do
     
     result = %{
       a: {:sub_map,
-        %{
-          "b" => {:sub_map,
-          %{
-            3 => {:sub_map,
-              %{
-                42.0 => {:sub_map,
-                %{
-                  "really deep" => {:different,
-                    %{left: "modified!", right: :original}}  
+        %{"b" => {:sub_map,
+            %{3 => {:sub_map,
+                %{42.0 => {:sub_map,
+                    %{"really deep" => {:different,
+                        %{left: "modified!", right: :original}}  
+                    }}
                 }}
-              }}
-          }}
+            }}
         }}
     }
     assert result == HashCompare.compare(left, right, true)
