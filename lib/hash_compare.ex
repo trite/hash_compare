@@ -43,7 +43,7 @@ defmodule HashCompare do
       
   """
   
-  def compare(left, right, deep) do
+  def compare(left, right, deep) when is_map(left) and is_map(right) and is_boolean(deep) do
     left_result = 
       for {k1, v1} <- left, into: %{} do
         if Map.has_key?(right, k1) do
@@ -68,6 +68,10 @@ defmodule HashCompare do
     Map.merge(left_result, right_result)
   end
   
+  def compare(_left, _right, _deep) do
+    raise ArgumentError, message: "Must supply 2 Maps and a Boolean!"
+  end
+  
   defp compare_values(key, left, right, deep) do
     if deep do
       deep_compare_values(key, left, right)
@@ -78,6 +82,32 @@ defmodule HashCompare do
 
   defp deep_compare_values(key, left, right) when is_map(left) and is_map(right) do
     {key, {:sub_map, compare(left, right, true)}}
+  end
+  
+  defp deep_compare_values(key, left, right) when is_list(left) and is_list(right) do
+    left_result =
+      for v1 <- left do
+        if Enum.member?(right, v1) do
+          {:same, v1}
+        else
+          {:left_only, v1}
+        end
+      end
+      
+    right_result =
+      for v2 <- right do
+        if Enum.member?(left, v2) do
+          {:drop, nil}
+        else
+          {:keep, {:right_only, v2}}
+        end
+      end
+      |> Enum.filter(fn(x) -> elem(x,0) == :keep end)
+      |> Enum.map(fn(x) -> elem(x,1) end)
+
+    result = Enum.concat(left_result, right_result)
+    
+    {key, result}
   end
 
   defp deep_compare_values(key, left, right) do
